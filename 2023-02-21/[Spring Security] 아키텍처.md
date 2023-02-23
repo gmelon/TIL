@@ -463,15 +463,90 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 앞서 권한이 필요한 페이지에 로그인 하지 않고 접속하면 Exception이 발생하고, 로그인 페이지로 이동하게 된다. 이렇게 인증, 인가 실패 등으로 Exception이 터졌을 때 리다이렉션은 누가 어떻게 처리하는걸까?
 
+>   ExceptionTranslationFilter는 `AccessDeniedException`과 `AuthenticationException`을 처리한다.
 
+### AuthenticationException
+
+인증에 실패했을 때 발생하는 예외로, `AuthenticationEntryPoint` 를 실행한다. `AbstractSecurityInterceptor` 의 하위 클래스에서 발생하는 예외만 처리한다. `AuthenticationEntryPoint`는 인터페이스로 여러 구현체가 있고 그 중 `LoginUrlAuthenticationEntryPoint` 는 아래와 같이 로그인 페이지로 리다이렉션하도록 구현되어 있다.
+
+![image-20230223144357726](./images/login_url_authentication_entry_point.png)
+
+`UsernamePasswordAuthenticationFilter` 에서 로그인 실패로 발생한 인증 에러는 해당 클래스의 상위 클래스인  `AbstractAuthenticationProcessingFilter`(아래 코드) 에서 처리한다.
+
+![image-20230223143143989](./images/abstract_authentication_processing_filter.png)
+
+### AccessDeniedException
+
+인가에 실패했을 때 발생하는 오류, 익명 사용자라면 `AuthenticationEntryPoint` 를 실행하고 아니라면 `AccessDeniedHandler` 에게 예외 처리를 위임한다.
+
+```java
+// class AccessDeniedHandlerImpl implements AccessDeniedHandler
+...
+
+@Override
+public void handle(HttpServletRequest request, HttpServletResponse response,
+        AccessDeniedException accessDeniedException) throws IOException, ServletException {
+    if (response.isCommitted()) {
+        logger.trace("Did not write to response since already committed");
+        return;
+    }
+    if (this.errorPage == null) {
+        logger.debug("Responding with 403 status code");
+        response.sendError(HttpStatus.FORBIDDEN.value(), HttpStatus.FORBIDDEN.getReasonPhrase());
+        return;
+    }
+    // Put exception into request scope (perhaps of use to a view)
+    request.setAttribute(WebAttributes.ACCESS_DENIED_403, accessDeniedException);
+    // Set the 403 status code.
+    response.setStatus(HttpStatus.FORBIDDEN.value());
+    // forward to error page.
+    if (logger.isDebugEnabled()) {
+        logger.debug(LogMessage.format("Forwarding to %s with status code 403", this.errorPage));
+    }
+    request.getRequestDispatcher(this.errorPage).forward(request, response);
+}
+
+...
+```
+
+
+
+## WebSecurity
+
+`WebSecurity`는 `WebSecurityConfiguration`에 의해 생성되며, `DelegatingFilterProxy`에서 필터 처리를 위임받는 `FilterChainProxy`를 생성하는데 사용된다.
+
+아래와 같이 `HttpSecurity` 를 인자로 받는 `configure` 메서드를 통해 시큐리티 관련 설정을 할 수 있다. (근데 Deprecated 되어서 다른 방법으로 설정하는 걸 찾아봐야 할 듯함)
+
+![image-20230223145550105](./images/http_security.png)
 
 ## 질문
 
-1.   `ProviderManager` 의 리스트는 누가 들고 있는지, 그들의 `parent`는 누가 주입해주는지?
-2.   서블릿 필터 & 체인 작동 방식
-3.   필터 vs 인터셉터
+1.   서블릿 체인
 
+     1.   `FilterChain` 에 여러 개의 필터가 등록되어 있음
+     2.   `doFilter()` 메서드는 `FilterChain chain` 을 인자로 받는다. 메서드 내부에서 아래와 같이 작성하면 된다.
 
+     ```java
+     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+         /* 
+          * 요청 처리 전 수행할 로직
+          */
+     
+         // 체인의 다음 필터 호출
+         chain.doFilter(request, response);
+         
+         /* 
+          * 요청 처리 전 수행할 로직
+          */
+     }
+     ```
+
+     
+
+2.   필터 vs 인터셉터 (간단히)
+
+     1.   필터 - J2EE 표준, 디스패처 서블릿 호출 전 / 후로 작동
+     2.   인터셉터 - 스프링에서 제공하는 기능, 디스패처 서블릿이 컨트롤러를 호출하기 전 / 후로 작동
 
 ## 출처
 
