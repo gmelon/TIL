@@ -513,9 +513,9 @@ public void handle(HttpServletRequest request, HttpServletResponse response,
 
 ## WebSecurity
 
-`WebSecurity`는 `WebSecurityConfiguration`에 의해 생성되며, `DelegatingFilterProxy`에서 필터 처리를 위임받는 `FilterChainProxy`를 생성하는데 사용된다.
+`WebSecurity`는 기본적으로 `WebSecurityConfiguration`에 의해 생성되며, `DelegatingFilterProxy`에서 필터 처리를 위임받는 `FilterChainProxy`를 생성하는데 사용된다.
 
-아래와 같이 `HttpSecurity` 를 인자로 받는 `configure` 메서드를 통해 시큐리티 관련 설정을 할 수 있다. (근데 Deprecated 되어서 다른 방법으로 설정하는 걸 찾아봐야 할 듯함)
+아래와 같이 `WebSecurityConfigurerAdapter`를 상속받아  `HttpSecurity` 를 인자로 받는 `configure` 메서드를 재정의하면 시큐리티 관련 설정을 커스텀 할 수 있다. (근데 Deprecated 되어서 다른 방법으로 설정하는 걸 찾아봐야 할 듯함)
 
 ![image-20230223145550105](./images/http_security.png)
 
